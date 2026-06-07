@@ -3,40 +3,18 @@ import mediapipe as mp
 import pyautogui
 import os
 import time
+import math
 import speech_recognition as sr
 import pyttsx3
 import webbrowser
-import google.generativeai as genai
-from dotenv import load_dotenv
 
-# =========================
-# GEMINI SETUP
-# =========================
-
-load_dotenv()
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-2.0-flash")
-else:
-    model = None
-
-# =========================
-# TEXT TO SPEECH
-# =========================
-
+# Voice setup
 engine = pyttsx3.init()
 
 def speak(text):
     print("Assistant:", text)
     engine.say(text[:250])
     engine.runAndWait()
-
-# =========================
-# SPEECH RECOGNITION
-# =========================
 
 recognizer = sr.Recognizer()
 
@@ -46,15 +24,8 @@ def listen_command():
         recognizer.adjust_for_ambient_noise(source, duration=1)
 
         try:
-            audio = recognizer.listen(
-                source,
-                timeout=6,
-                phrase_time_limit=8
-            )
-
-            command = recognizer.recognize_google(audio)
-            command = command.lower()
-
+            audio = recognizer.listen(source, timeout=6, phrase_time_limit=8)
+            command = recognizer.recognize_google(audio).lower()
             print("You said:", command)
             return command
 
@@ -70,105 +41,47 @@ def listen_command():
             speak("Speech service error")
             return ""
 
-# =========================
-# GEMINI AI RESPONSE
-# =========================
-
-def ask_gemini(command):
-
-    if model is None:
-        return "Gemini API key is missing. Please check your .env file."
-
-    prompt = f"""
-You are GestureAI, an AI-powered computer assistant.
-
-User command: "{command}"
-
-Rules:
-1. If user wants to open a website, return exactly:
-OPEN_URL: website_url
-
-2. If user wants to search something, return exactly:
-SEARCH: search_query
-
-3. If user asks questions like interview questions, explanations, roadmap, or preparation tips,
-give a short useful answer in simple words.
-
-4. Keep answer short and clear.
-"""
-
-    try:
-        response = model.generate_content(prompt)
-        return response.text.strip()
-
-    except Exception as e:
-        return f"Gemini error: {e}"
-
-# =========================
-# COMMAND EXECUTION
-# =========================
-
 def execute_voice_command(command):
-
     if command == "":
         return
-
-    # Direct commands first
 
     if "open chrome" in command:
         speak("Opening Chrome")
         os.system("start chrome")
-        return
 
-    if "open vs code" in command or "open visual studio code" in command:
+    elif "open youtube" in command:
+        speak("Opening YouTube")
+        webbrowser.open("https://www.youtube.com")
+
+    elif "open github" in command:
+        speak("Opening GitHub")
+        webbrowser.open("https://github.com")
+
+    elif "open vs code" in command or "open visual studio code" in command:
         speak("Opening VS Code")
         os.system("code")
-        return
 
-    if "volume up" in command:
-        speak("Increasing volume")
-        pyautogui.press("volumeup")
-        return
-
-    if "volume down" in command:
-        speak("Decreasing volume")
-        pyautogui.press("volumedown")
-        return
-
-    if "play" in command or "pause" in command:
-        speak("Playing or pausing media")
-        pyautogui.press("playpause")
-        return
-
-    # Gemini handles all other smart commands
-
-    ai_response = ask_gemini(command)
-
-    print("Gemini:", ai_response)
-
-    if ai_response.startswith("OPEN_URL:"):
-        url = ai_response.replace("OPEN_URL:", "").strip()
-
-        if not url.startswith("http"):
-            url = "https://" + url
-
-        speak("Opening website")
-        webbrowser.open(url)
-        return
-
-    if ai_response.startswith("SEARCH:"):
-        query = ai_response.replace("SEARCH:", "").strip()
-
+    elif "search" in command:
+        query = command.replace("search", "").strip()
         speak(f"Searching for {query}")
         webbrowser.open(f"https://www.google.com/search?q={query}")
-        return
 
-    speak(ai_response)
+    elif "volume up" in command:
+        speak("Increasing volume")
+        pyautogui.press("volumeup")
 
-# =========================
-# MEDIAPIPE SETUP
-# =========================
+    elif "volume down" in command:
+        speak("Decreasing volume")
+        pyautogui.press("volumedown")
 
+    elif "play" in command or "pause" in command:
+        speak("Playing or pausing media")
+        pyautogui.press("playpause")
+
+    else:
+        speak("Command not recognized yet")
+
+# MediaPipe setup
 mp_hands = mp.solutions.hands
 mp_draw = mp.solutions.drawing_utils
 
@@ -178,21 +91,18 @@ hands = mp_hands.Hands(
     min_tracking_confidence=0.7
 )
 
-# =========================
-# CAMERA SETUP
-# =========================
-
 cap = cv2.VideoCapture(0)
 
+screen_width, screen_height = pyautogui.size()
+
 last_action_time = 0
+last_click_time = 0
 ready_for_palm = True
 
-# =========================
-# FINGER DETECTION
-# =========================
+def distance(p1, p2):
+    return math.hypot(p2[0] - p1[0], p2[1] - p1[1])
 
 def count_fingers(hand_landmarks):
-
     fingers = []
 
     # Thumb
@@ -203,21 +113,14 @@ def count_fingers(hand_landmarks):
 
     # Index, middle, ring, pinky
     for tip in [8, 12, 16, 20]:
-
         if hand_landmarks.landmark[tip].y < hand_landmarks.landmark[tip - 2].y:
             fingers.append(1)
-
         else:
             fingers.append(0)
 
     return fingers
 
-# =========================
-# GESTURE RECOGNITION
-# =========================
-
 def recognize_gesture(fingers):
-
     if fingers == [0, 0, 0, 0, 0]:
         return "Fist"
 
@@ -228,22 +131,14 @@ def recognize_gesture(fingers):
         return "Victory"
 
     elif fingers == [0, 1, 0, 0, 0]:
-        return "One Finger"
+        return "Air Mouse"
 
     elif fingers == [0, 1, 1, 1, 0]:
         return "Three Fingers"
 
-    elif fingers == [1, 0, 0, 0, 0]:
-        return "Thumbs Up"
-
     return "Unknown"
 
-# =========================
-# GESTURE ACTIONS
-# =========================
-
 def perform_gesture_action(gesture):
-
     if gesture == "Palm":
         command = listen_command()
         execute_voice_command(command)
@@ -252,20 +147,42 @@ def perform_gesture_action(gesture):
         speak("Opening VS Code")
         os.system("code")
 
-    elif gesture == "One Finger":
-        speak("Volume Up")
-        pyautogui.press("volumeup")
-
     elif gesture == "Three Fingers":
         speak("Volume Down")
         pyautogui.press("volumedown")
 
-# =========================
-# MAIN LOOP
-# =========================
+def air_mouse_control(hand_landmarks, frame_width, frame_height):
+    global last_click_time
+
+    index_tip = hand_landmarks.landmark[8]
+    thumb_tip = hand_landmarks.landmark[4]
+
+    index_x = int(index_tip.x * frame_width)
+    index_y = int(index_tip.y * frame_height)
+
+    thumb_x = int(thumb_tip.x * frame_width)
+    thumb_y = int(thumb_tip.y * frame_height)
+
+    screen_x = int(index_tip.x * screen_width)
+    screen_y = int(index_tip.y * screen_height)
+
+    pyautogui.moveTo(screen_x, screen_y)
+
+    pinch_distance = distance(
+        (index_x, index_y),
+        (thumb_x, thumb_y)
+    )
+
+    current_time = time.time()
+
+    if pinch_distance < 35 and current_time - last_click_time > 1:
+        pyautogui.click()
+        print("Left Click")
+        last_click_time = current_time
+
+    return index_x, index_y, pinch_distance
 
 while True:
-
     success, frame = cap.read()
 
     if not success:
@@ -273,20 +190,15 @@ while True:
         break
 
     frame = cv2.flip(frame, 1)
+    h, w, c = frame.shape
 
-    rgb_frame = cv2.cvtColor(
-        frame,
-        cv2.COLOR_BGR2RGB
-    )
-
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     result = hands.process(rgb_frame)
 
     gesture = "No Hand"
 
     if result.multi_hand_landmarks:
-
         for hand_landmarks in result.multi_hand_landmarks:
-
             mp_draw.draw_landmarks(
                 frame,
                 hand_landmarks,
@@ -294,7 +206,6 @@ while True:
             )
 
             fingers = count_fingers(hand_landmarks)
-
             gesture = recognize_gesture(fingers)
 
             cv2.putText(
@@ -315,33 +226,46 @@ while True:
                 cv2.destroyAllWindows()
                 exit()
 
-            # Palm activates voice assistant once
-            if gesture == "Palm" and ready_for_palm:
+            if gesture == "Air Mouse":
+                index_x, index_y, pinch_distance = air_mouse_control(
+                    hand_landmarks,
+                    w,
+                    h
+                )
 
+                cv2.circle(
+                    frame,
+                    (index_x, index_y),
+                    12,
+                    (0, 255, 0),
+                    cv2.FILLED
+                )
+
+                cv2.putText(
+                    frame,
+                    f"Pinch: {int(pinch_distance)}",
+                    (30, 110),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (255, 0, 0),
+                    2
+                )
+
+            elif gesture == "Palm" and ready_for_palm:
                 if current_time - last_action_time > 2:
-
                     perform_gesture_action(gesture)
-
                     last_action_time = current_time
-
                     ready_for_palm = False
 
-            # Other gesture shortcuts
-            elif gesture in ["Victory", "One Finger", "Three Fingers"]:
-
+            elif gesture in ["Victory", "Three Fingers"]:
                 if current_time - last_action_time > 4:
-
                     perform_gesture_action(gesture)
-
                     last_action_time = current_time
 
     else:
         ready_for_palm = True
 
-    cv2.imshow(
-        "GestureAI - Gemini AI Assistant",
-        frame
-    )
+    cv2.imshow("GestureAI Pro - Combined Assistant", frame)
 
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
