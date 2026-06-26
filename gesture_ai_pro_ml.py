@@ -12,10 +12,6 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-# =========================
-# Voice setup
-# =========================
-
 engine = pyttsx3.init()
 
 def speak(text):
@@ -96,16 +92,9 @@ def execute_voice_command(command):
         current_action = "Unknown voice command"
         speak("Command not recognized yet")
 
-# =========================
-# Load ML model
-# =========================
 
 MODEL_FILE = "gesture_model.pkl"
 model = joblib.load(MODEL_FILE)
-
-# =========================
-# MediaPipe setup
-# =========================
 
 mp_hands = mp.solutions.hands
 mp_draw = mp.solutions.drawing_utils
@@ -128,15 +117,16 @@ prev_time = 0
 
 ACTION_COOLDOWN = 4
 
-# Smooth Air Mouse settings
 smooth_x = 0
 smooth_y = 0
 SMOOTHING = 7
 FRAME_REDUCTION = 80
 
-# =========================
-# Helper functions
-# =========================
+CONFIDENCE_THRESHOLD = 75
+STABLE_FRAME_COUNT = 5
+gesture_history = []
+stable_gesture = "No Hand"
+
 
 def extract_landmarks(hand_landmarks):
     data = []
@@ -159,8 +149,27 @@ def detect_three_fingers_rule(hand_landmarks):
 
     return fingers_up == [1, 1, 1, 0]
 
+def get_stable_gesture(predicted_gesture, confidence):
+    global gesture_history, stable_gesture
+
+    if confidence < CONFIDENCE_THRESHOLD:
+        gesture_history = []
+        stable_gesture = "Low Confidence"
+        return stable_gesture
+
+    gesture_history.append(predicted_gesture)
+
+    if len(gesture_history) > STABLE_FRAME_COUNT:
+        gesture_history.pop(0)
+
+    if len(gesture_history) == STABLE_FRAME_COUNT:
+        if all(g == predicted_gesture for g in gesture_history):
+            stable_gesture = predicted_gesture
+
+    return stable_gesture
+
 def air_mouse_control(hand_landmarks, frame_width, frame_height):
-    global last_click_time, smooth_x, smooth_y
+    global last_click_time, smooth_x, smooth_y, current_action
 
     index_tip = hand_landmarks.landmark[8]
     thumb_tip = hand_landmarks.landmark[4]
@@ -183,7 +192,6 @@ def air_mouse_control(hand_landmarks, frame_width, frame_height):
     pyautogui.moveTo(int(smooth_x), int(smooth_y), duration=0.01)
 
     pinch_distance = distance((index_x, index_y), (thumb_x, thumb_y))
-
     current_time = time.time()
 
     if pinch_distance < 30 and current_time - last_click_time > 1:
@@ -207,76 +215,35 @@ def format_gesture_name(gesture):
         "peace": "Peace",
         "fist": "Fist",
         "stop": "Stop",
-        "No Hand": "No Hand"
+        "No Hand": "No Hand",
+        "Low Confidence": "Low Confidence"
     }
     return names.get(gesture, gesture)
 
 def draw_dashboard(frame, gesture, action, status, confidence, fps):
     cv2.rectangle(frame, (0, 0), (700, 220), (35, 35, 35), -1)
 
-    cv2.putText(
-        frame,
-        "GestureAI Pro v2.0",
-        (20, 35),
-        cv2.FONT_HERSHEY_DUPLEX,
-        1,
-        (0, 255, 255),
-        2
-    )
+    cv2.putText(frame, "GestureAI Pro v2.0", (20, 35),
+                cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 255), 2)
 
     cv2.line(frame, (20, 50), (620, 50), (100, 100, 100), 2)
 
-    cv2.putText(
-        frame,
-        f"Gesture     : {format_gesture_name(gesture)}",
-        (20, 85),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
-        (255, 255, 0),
-        2
-    )
+    cv2.putText(frame, f"Gesture     : {format_gesture_name(gesture)}", (20, 85),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
-    cv2.putText(
-        frame,
-        f"Action      : {action}",
-        (20, 120),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
-        (0, 255, 0),
-        2
-    )
+    cv2.putText(frame, f"Action      : {action}", (20, 120),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
     status_color = (0, 255, 0) if status == "Tracking" else (0, 0, 255)
 
-    cv2.putText(
-        frame,
-        f"Status      : {status}",
-        (20, 155),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
-        status_color,
-        2
-    )
+    cv2.putText(frame, f"Status      : {status}", (20, 155),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2)
 
-    cv2.putText(
-        frame,
-        f"Confidence  : {confidence:.1f}%",
-        (20, 190),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
-        (255, 255, 255),
-        2
-    )
+    cv2.putText(frame, f"Confidence  : {confidence:.1f}%", (20, 190),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-    cv2.putText(
-        frame,
-        f"FPS : {fps}",
-        (500, 190),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.7,
-        (255, 255, 255),
-        2
-    )
+    cv2.putText(frame, f"FPS : {fps}", (500, 190),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
 def perform_ml_action(gesture, hand_landmarks, frame_width, frame_height):
     global last_action_time, ready_for_palm, current_action
@@ -358,9 +325,6 @@ def perform_ml_action(gesture, hand_landmarks, frame_width, frame_height):
 
     return None, None, None, None
 
-# =========================
-# Main loop
-# =========================
 
 while True:
     success, frame = cap.read()
@@ -380,6 +344,7 @@ while True:
     result = hands.process(rgb_frame)
 
     predicted_gesture = "No Hand"
+    display_gesture = "No Hand"
     confidence = 0.0
     status = "Waiting"
 
@@ -387,11 +352,7 @@ while True:
         status = "Tracking"
 
         for hand_landmarks in result.multi_hand_landmarks:
-            mp_draw.draw_landmarks(
-                frame,
-                hand_landmarks,
-                mp_hands.HAND_CONNECTIONS
-            )
+            mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
             landmarks = extract_landmarks(hand_landmarks)
 
@@ -405,12 +366,18 @@ while True:
             else:
                 predicted_gesture = raw_prediction
 
-            action_text, index_x, index_y, pinch_distance = perform_ml_action(
-                predicted_gesture,
-                hand_landmarks,
-                w,
-                h
-            )
+            stable_prediction = get_stable_gesture(predicted_gesture, confidence)
+            display_gesture = stable_prediction
+
+            if stable_prediction not in ["Low Confidence", "No Hand"]:
+                action_text, index_x, index_y, pinch_distance = perform_ml_action(
+                    stable_prediction,
+                    hand_landmarks,
+                    w,
+                    h
+                )
+            else:
+                action_text, index_x, index_y, pinch_distance = None, None, None, None
 
             if index_x is not None:
                 cv2.circle(frame, (index_x, index_y), 15, (0, 255, 0), cv2.FILLED)
@@ -429,6 +396,9 @@ while True:
     else:
         ready_for_palm = True
         current_action = "Waiting..."
+        gesture_history = []
+        stable_gesture = "No Hand"
+        display_gesture = "No Hand"
 
     cv2.rectangle(
         frame,
@@ -440,7 +410,7 @@ while True:
 
     draw_dashboard(
         frame,
-        predicted_gesture,
+        display_gesture,
         current_action,
         status,
         confidence,
