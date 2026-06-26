@@ -8,6 +8,9 @@ import joblib
 import speech_recognition as sr
 import pyttsx3
 import webbrowser
+import warnings
+
+warnings.filterwarnings("ignore")
 
 # =========================
 # Voice setup
@@ -16,7 +19,6 @@ import webbrowser
 engine = pyttsx3.init()
 
 def speak(text):
-    global current_action
     print("Assistant:", text)
     engine.say(text[:250])
     engine.runAndWait()
@@ -33,15 +35,12 @@ def listen_command():
             command = recognizer.recognize_google(audio).lower()
             print("You said:", command)
             return command
-
         except sr.WaitTimeoutError:
             speak("No voice detected")
             return ""
-
         except sr.UnknownValueError:
             speak("Sorry, I could not understand")
             return ""
-
         except sr.RequestError:
             speak("Speech service error")
             return ""
@@ -129,6 +128,12 @@ prev_time = 0
 
 ACTION_COOLDOWN = 4
 
+# Smooth Air Mouse settings
+smooth_x = 0
+smooth_y = 0
+SMOOTHING = 7
+FRAME_REDUCTION = 80
+
 # =========================
 # Helper functions
 # =========================
@@ -155,7 +160,7 @@ def detect_three_fingers_rule(hand_landmarks):
     return fingers_up == [1, 1, 1, 0]
 
 def air_mouse_control(hand_landmarks, frame_width, frame_height):
-    global last_click_time
+    global last_click_time, smooth_x, smooth_y
 
     index_tip = hand_landmarks.landmark[8]
     thumb_tip = hand_landmarks.landmark[4]
@@ -166,17 +171,24 @@ def air_mouse_control(hand_landmarks, frame_width, frame_height):
     thumb_x = int(thumb_tip.x * frame_width)
     thumb_y = int(thumb_tip.y * frame_height)
 
-    screen_x = int(index_tip.x * screen_width)
-    screen_y = int(index_tip.y * screen_height)
+    x = max(FRAME_REDUCTION, min(frame_width - FRAME_REDUCTION, index_x))
+    y = max(FRAME_REDUCTION, min(frame_height - FRAME_REDUCTION, index_y))
 
-    pyautogui.moveTo(screen_x, screen_y)
+    screen_x = (x - FRAME_REDUCTION) * screen_width / (frame_width - 2 * FRAME_REDUCTION)
+    screen_y = (y - FRAME_REDUCTION) * screen_height / (frame_height - 2 * FRAME_REDUCTION)
+
+    smooth_x = smooth_x + (screen_x - smooth_x) / SMOOTHING
+    smooth_y = smooth_y + (screen_y - smooth_y) / SMOOTHING
+
+    pyautogui.moveTo(int(smooth_x), int(smooth_y), duration=0.01)
 
     pinch_distance = distance((index_x, index_y), (thumb_x, thumb_y))
 
     current_time = time.time()
 
-    if pinch_distance < 35 and current_time - last_click_time > 1:
+    if pinch_distance < 30 and current_time - last_click_time > 1:
         pyautogui.click()
+        current_action = "Left Click"
         print("Left Click")
         last_click_time = current_time
 
@@ -200,10 +212,8 @@ def format_gesture_name(gesture):
     return names.get(gesture, gesture)
 
 def draw_dashboard(frame, gesture, action, status, confidence, fps):
-    # Header background
     cv2.rectangle(frame, (0, 0), (700, 220), (35, 35, 35), -1)
 
-    # Title
     cv2.putText(
         frame,
         "GestureAI Pro v2.0",
@@ -214,10 +224,8 @@ def draw_dashboard(frame, gesture, action, status, confidence, fps):
         2
     )
 
-    # Divider line
     cv2.line(frame, (20, 50), (620, 50), (100, 100, 100), 2)
 
-    # Dashboard fields
     cv2.putText(
         frame,
         f"Gesture     : {format_gesture_name(gesture)}",
@@ -405,13 +413,8 @@ while True:
             )
 
             if index_x is not None:
-                cv2.circle(
-                    frame,
-                    (index_x, index_y),
-                    12,
-                    (0, 255, 0),
-                    cv2.FILLED
-                )
+                cv2.circle(frame, (index_x, index_y), 15, (0, 255, 0), cv2.FILLED)
+                cv2.circle(frame, (index_x, index_y), 25, (255, 255, 255), 2)
 
                 cv2.putText(
                     frame,
@@ -426,6 +429,14 @@ while True:
     else:
         ready_for_palm = True
         current_action = "Waiting..."
+
+    cv2.rectangle(
+        frame,
+        (FRAME_REDUCTION, FRAME_REDUCTION),
+        (w - FRAME_REDUCTION, h - FRAME_REDUCTION),
+        (255, 255, 0),
+        2
+    )
 
     draw_dashboard(
         frame,
