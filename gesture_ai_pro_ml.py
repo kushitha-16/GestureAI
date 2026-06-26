@@ -16,6 +16,7 @@ import webbrowser
 engine = pyttsx3.init()
 
 def speak(text):
+    global current_action
     print("Assistant:", text)
     engine.say(text[:250])
     engine.runAndWait()
@@ -46,43 +47,54 @@ def listen_command():
             return ""
 
 def execute_voice_command(command):
+    global current_action
+
     if command == "":
         return
 
     if "open chrome" in command:
+        current_action = "Opening Chrome"
         speak("Opening Chrome")
         os.system("start chrome")
 
     elif "open youtube" in command:
+        current_action = "Opening YouTube"
         speak("Opening YouTube")
         webbrowser.open("https://www.youtube.com")
 
     elif "open github" in command:
+        current_action = "Opening GitHub"
         speak("Opening GitHub")
         webbrowser.open("https://github.com")
 
     elif "open vs code" in command or "open visual studio code" in command:
+        current_action = "Opening VS Code"
         speak("Opening VS Code")
         os.system("code")
 
     elif "search" in command:
         query = command.replace("search", "").strip()
+        current_action = f"Searching {query}"
         speak(f"Searching for {query}")
         webbrowser.open(f"https://www.google.com/search?q={query}")
 
     elif "volume up" in command:
+        current_action = "Volume Up"
         speak("Increasing volume")
         pyautogui.press("volumeup")
 
     elif "volume down" in command:
+        current_action = "Volume Down"
         speak("Decreasing volume")
         pyautogui.press("volumedown")
 
     elif "play" in command or "pause" in command:
+        current_action = "Play / Pause"
         speak("Playing or pausing media")
         pyautogui.press("playpause")
 
     else:
+        current_action = "Unknown voice command"
         speak("Command not recognized yet")
 
 # =========================
@@ -112,6 +124,8 @@ screen_width, screen_height = pyautogui.size()
 last_action_time = 0
 last_click_time = 0
 ready_for_palm = True
+current_action = "Waiting..."
+prev_time = 0
 
 ACTION_COOLDOWN = 4
 
@@ -121,10 +135,8 @@ ACTION_COOLDOWN = 4
 
 def extract_landmarks(hand_landmarks):
     data = []
-
     for landmark in hand_landmarks.landmark:
         data.extend([landmark.x, landmark.y, landmark.z])
-
     return data
 
 def distance(p1, p2):
@@ -140,7 +152,6 @@ def detect_three_fingers_rule(hand_landmarks):
         else:
             fingers_up.append(0)
 
-    # Index + middle + ring up, pinky down
     return fingers_up == [1, 1, 1, 0]
 
 def air_mouse_control(hand_landmarks, frame_width, frame_height):
@@ -160,10 +171,7 @@ def air_mouse_control(hand_landmarks, frame_width, frame_height):
 
     pyautogui.moveTo(screen_x, screen_y)
 
-    pinch_distance = distance(
-        (index_x, index_y),
-        (thumb_x, thumb_y)
-    )
+    pinch_distance = distance((index_x, index_y), (thumb_x, thumb_y))
 
     current_time = time.time()
 
@@ -174,18 +182,108 @@ def air_mouse_control(hand_landmarks, frame_width, frame_height):
 
     return index_x, index_y, pinch_distance
 
+def format_gesture_name(gesture):
+    names = {
+        "palm": "Palm",
+        "victory": "Victory",
+        "one_finger": "One Finger",
+        "ok_sign": "OK Sign",
+        "thumbs_up": "Thumbs Up",
+        "three_fingers": "Three Fingers",
+        "rock": "Rock",
+        "call_me": "Call Me",
+        "peace": "Peace",
+        "fist": "Fist",
+        "stop": "Stop",
+        "No Hand": "No Hand"
+    }
+    return names.get(gesture, gesture)
+
+def draw_dashboard(frame, gesture, action, status, confidence, fps):
+    # Header background
+    cv2.rectangle(frame, (0, 0), (700, 220), (35, 35, 35), -1)
+
+    # Title
+    cv2.putText(
+        frame,
+        "GestureAI Pro v2.0",
+        (20, 35),
+        cv2.FONT_HERSHEY_DUPLEX,
+        1,
+        (0, 255, 255),
+        2
+    )
+
+    # Divider line
+    cv2.line(frame, (20, 50), (620, 50), (100, 100, 100), 2)
+
+    # Dashboard fields
+    cv2.putText(
+        frame,
+        f"Gesture     : {format_gesture_name(gesture)}",
+        (20, 85),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (255, 255, 0),
+        2
+    )
+
+    cv2.putText(
+        frame,
+        f"Action      : {action}",
+        (20, 120),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (0, 255, 0),
+        2
+    )
+
+    status_color = (0, 255, 0) if status == "Tracking" else (0, 0, 255)
+
+    cv2.putText(
+        frame,
+        f"Status      : {status}",
+        (20, 155),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        status_color,
+        2
+    )
+
+    cv2.putText(
+        frame,
+        f"Confidence  : {confidence:.1f}%",
+        (20, 190),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (255, 255, 255),
+        2
+    )
+
+    cv2.putText(
+        frame,
+        f"FPS : {fps}",
+        (500, 190),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (255, 255, 255),
+        2
+    )
+
 def perform_ml_action(gesture, hand_landmarks, frame_width, frame_height):
-    global last_action_time, ready_for_palm
+    global last_action_time, ready_for_palm, current_action
 
     current_time = time.time()
 
     if gesture == "fist":
+        current_action = "Exit Application"
         speak("Goodbye")
         cap.release()
         cv2.destroyAllWindows()
         exit()
 
     if gesture == "one_finger":
+        current_action = "Air Mouse Active"
         index_x, index_y, pinch_distance = air_mouse_control(
             hand_landmarks,
             frame_width,
@@ -197,47 +295,56 @@ def perform_ml_action(gesture, hand_landmarks, frame_width, frame_height):
         return None, None, None, None
 
     if gesture == "palm" and ready_for_palm:
+        current_action = "Voice Assistant"
         command = listen_command()
         execute_voice_command(command)
         ready_for_palm = False
         last_action_time = current_time
 
     elif gesture == "victory":
+        current_action = "Opening VS Code"
         speak("Opening VS Code")
         os.system("code")
         last_action_time = current_time
 
     elif gesture == "thumbs_up":
+        current_action = "Volume Up"
         speak("Volume Up")
         pyautogui.press("volumeup")
         last_action_time = current_time
 
     elif gesture == "three_fingers":
+        current_action = "Volume Down"
         speak("Volume Down")
         pyautogui.press("volumedown")
         last_action_time = current_time
 
     elif gesture == "rock":
+        current_action = "Play / Pause"
         speak("Play or Pause")
         pyautogui.press("playpause")
         last_action_time = current_time
 
     elif gesture == "call_me":
+        current_action = "Opening YouTube"
         speak("Opening YouTube")
         webbrowser.open("https://www.youtube.com")
         last_action_time = current_time
 
     elif gesture == "peace":
+        current_action = "Opening GitHub"
         speak("Opening GitHub")
         webbrowser.open("https://github.com")
         last_action_time = current_time
 
     elif gesture == "ok_sign":
+        current_action = "Left Click"
         speak("Left Click")
         pyautogui.click()
         last_action_time = current_time
 
     elif gesture == "stop":
+        current_action = "Stop Detected"
         speak("Stop gesture detected")
         last_action_time = current_time
 
@@ -254,6 +361,10 @@ while True:
         print("Camera not detected")
         break
 
+    current_time_for_fps = time.time()
+    fps = int(1 / (current_time_for_fps - prev_time)) if prev_time != 0 else 0
+    prev_time = current_time_for_fps
+
     frame = cv2.flip(frame, 1)
     h, w, c = frame.shape
 
@@ -261,8 +372,12 @@ while True:
     result = hands.process(rgb_frame)
 
     predicted_gesture = "No Hand"
+    confidence = 0.0
+    status = "Waiting"
 
     if result.multi_hand_landmarks:
+        status = "Tracking"
+
         for hand_landmarks in result.multi_hand_landmarks:
             mp_draw.draw_landmarks(
                 frame,
@@ -272,10 +387,13 @@ while True:
 
             landmarks = extract_landmarks(hand_landmarks)
 
-            raw_prediction = model.predict([landmarks])[0]
+            prob = model.predict_proba([landmarks])[0]
+            confidence = max(prob) * 100
+            raw_prediction = model.classes_[prob.argmax()]
 
             if detect_three_fingers_rule(hand_landmarks):
                 predicted_gesture = "three_fingers"
+                confidence = max(confidence, 95.0)
             else:
                 predicted_gesture = raw_prediction
 
@@ -285,27 +403,6 @@ while True:
                 w,
                 h
             )
-
-            cv2.putText(
-                frame,
-                f"ML Gesture: {predicted_gesture}",
-                (30, 60),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 255, 0),
-                2
-            )
-
-            if action_text:
-                cv2.putText(
-                    frame,
-                    action_text,
-                    (30, 110),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.9,
-                    (255, 0, 0),
-                    2
-                )
 
             if index_x is not None:
                 cv2.circle(
@@ -319,7 +416,7 @@ while True:
                 cv2.putText(
                     frame,
                     f"Pinch: {int(pinch_distance)}",
-                    (30, 160),
+                    (20, 250),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.8,
                     (255, 0, 0),
@@ -328,18 +425,18 @@ while True:
 
     else:
         ready_for_palm = True
+        current_action = "Waiting..."
 
-        cv2.putText(
-            frame,
-            "No Hand",
-            (30, 60),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 0, 255),
-            2
-        )
+    draw_dashboard(
+        frame,
+        predicted_gesture,
+        current_action,
+        status,
+        confidence,
+        fps
+    )
 
-    cv2.imshow("GestureAI Pro ML", frame)
+    cv2.imshow("GestureAI Pro Dashboard", frame)
 
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break

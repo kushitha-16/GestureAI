@@ -1,145 +1,230 @@
-# GestureAI – AI Powered Gesture and Voice Assistant
+# 🤖 GestureAI Pro – ML-Based Gesture and Voice Controlled Desktop Assistant
 
-## Overview
+## 🚀 Overview
 
-GestureAI is a Computer Vision and Voice-Controlled Desktop Assistant developed using Python, OpenCV, MediaPipe, Speech Recognition, and Gemini AI.
+GestureAI Pro is a real-time Computer Vision and Machine Learning desktop assistant that enables touchless interaction with a computer using hand gestures and voice commands.
 
-The system recognizes hand gestures through a webcam and performs desktop automation tasks such as launching applications, controlling volume, opening websites, navigating the system, and executing voice commands. It combines gesture recognition, voice interaction, and AI-powered responses to provide a touchless human-computer interaction experience.
+The project combines **OpenCV**, **MediaPipe**, **Scikit-learn**, **Speech Recognition**, and **PyAutoGUI** to create an intelligent Human-Computer Interaction (HCI) system capable of controlling desktop applications without using a keyboard or mouse.
+
+A custom Machine Learning model is trained on hand landmark data to recognize gestures and perform desktop automation tasks such as air mouse control, mouse clicking, volume control, application launching, browser navigation, and voice command execution.
 
 ---
 
-## Features
+# ✨ Features
 
-* Real-time hand tracking using MediaPipe
-* Gesture recognition using finger landmark detection
-* Voice command activation through gestures
-* AI-powered responses using Gemini AI
-* Desktop automation
-* Browser control
-* Volume control
+### 🤖 Machine Learning
+
+* Custom gesture dataset collection
+* K-Nearest Neighbors (KNN) gesture classifier
+* Real-time ML gesture prediction
+* Multiple gesture recognition
+
+### 🖐 Computer Vision
+
+* Real-time hand tracking
+* 21 hand landmark detection using MediaPipe
+* Gesture recognition using ML
+* Live webcam processing
+
+### 🖱 Desktop Automation
+
+* Air Mouse
+* Pinch Click
+* Volume Up
+* Volume Down
+* Play / Pause Media
+* Open VS Code
+* Open GitHub
+* Open YouTube
+
+### 🎙 Voice Assistant
+
+* Speech Recognition
+* Text-to-Speech
+* Voice-controlled browser search
 * Application launching
-* Air Mouse functionality
-* Human-Computer Interaction system
+* Desktop commands
 
 ---
 
-## Technology Stack
+# 🛠 Technology Stack
 
-### Programming Language
+## Programming Language
 
 * Python
 
-### Computer Vision
+## Machine Learning
+
+* Scikit-learn (KNN)
+* Joblib
+
+## Computer Vision
 
 * OpenCV
 * MediaPipe
 
-### Voice Processing
+## Speech Processing
 
 * SpeechRecognition
-* PyTTSx3
+* Pyttsx3
 
-### AI Integration
-
-* Gemini AI API
-
-### Automation
+## Desktop Automation
 
 * PyAutoGUI
 
-### Supporting Libraries
+## Supporting Libraries
 
 * NumPy
+* Pandas
 
 ---
 
-## Supported Gestures
+# 🎯 Supported Gestures
 
-| Gesture       | Action                   |
-| ------------- | ------------------------ |
-| Palm          | Activate Voice Assistant |
-| Victory       | Open VS Code             |
-| One Finger    | Volume Up                |
-| Three Fingers | Volume Down              |
-| Fist          | Exit Program             |
-
----
-
-## System Workflow
-
-Webcam Input
-
-↓
-
-MediaPipe Hand Tracking
-
-↓
-
-Hand Landmark Detection
-
-↓
-
-Gesture Recognition Engine
-
-↓
-
-Action Mapping
-
-↓
-
-Desktop Automation / Voice Commands
-
-↓
-
-Gemini AI Response
+| Gesture          | Action                   |
+| ---------------- | ------------------------ |
+| ✋ Palm           | Activate Voice Assistant |
+| ✌ Victory        | Open VS Code             |
+| ☝ One Finger     | Air Mouse                |
+| 👌 OK Sign       | Left Click               |
+| 👍 Thumbs Up     | Volume Up                |
+| 🖐 Three Fingers | Volume Down              |
+| 🤘 Rock          | Play / Pause Media       |
+| 🤙 Call Me       | Open YouTube             |
+| ☮ Peace          | Open GitHub              |
+| ✊ Fist           | Exit Application         |
 
 ---
 
-## Concepts Demonstrated
+# 📂 Project Structure
 
-* Computer Vision
-* Gesture Recognition
-* Human Computer Interaction (HCI)
-* Voice Processing
-* Desktop Automation
-* Artificial Intelligence
-* Generative AI Integration
-
----
-
-## Project Outcomes
-
-* Successfully implemented real-time hand gesture recognition.
-* Integrated voice command functionality for hands-free interaction.
-* Developed gesture-based desktop control system.
-* Enabled AI-powered responses using Gemini API.
-* Demonstrated practical application of Computer Vision and Human-Computer Interaction concepts.
-
----
-
-## Future Enhancements
-
-* Custom Gesture Training
-* Multi-Hand Recognition
-* Sign Language Recognition
-* Smart Home Automation
-* IoT Device Control
-* Deep Learning-Based Gesture Classification
-
----
-
-## Installation
-
-```bash
-git clone https://github.com/kushitha-16/GestureAI.git
-cd GestureAI
-pip install -r requirements.txt
-python main.py
+```text
+GestureAI/
+│
+├── main.py
+├── gesture_ai_pro_ml.py
+├── collect_data.py
+├── train_model.py
+├── ml_gesture_ai.py
+├── air_mouse.py
+├── direction_control.py
+├── gesture_data.csv
+├── gesture_model.pkl
+├── requirements.txt
+├── README.md
+└── screenshots/
 ```
 
 ---
 
-## Author
+# ⚙ System Workflow
+
+```
+Webcam
+   │
+   ▼
+MediaPipe Hand Detection
+   │
+   ▼
+21 Hand Landmarks
+   │
+   ▼
+Machine Learning Model (KNN)
+   │
+   ▼
+Gesture Prediction
+   │
+   ▼
+Action Mapping
+   │
+   ▼
+Desktop Automation & Voice Assistant
+```
+
+---
+
+# 🧠 Machine Learning Pipeline
+
+1. Collect hand landmark data
+2. Store landmarks in CSV dataset
+3. Train KNN gesture classifier
+4. Save trained model
+5. Load model for real-time prediction
+6. Execute corresponding desktop action
+
+---
+
+# 📸 Current Capabilities
+
+✅ Real-time Hand Tracking
+
+✅ Machine Learning Gesture Recognition
+
+✅ Air Mouse
+
+✅ Pinch Click
+
+✅ Volume Control
+
+✅ Voice Assistant
+
+✅ Browser Automation
+
+✅ VS Code Launcher
+
+✅ Desktop Automation
+
+---
+
+# 💻 Installation
+
+```bash
+git clone https://github.com/kushitha-16/GestureAI.git
+
+cd GestureAI
+
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+pip install -r requirements.txt
+
+python gesture_ai_pro_ml.py
+```
+
+---
+
+# 🎓 Concepts Demonstrated
+
+* Computer Vision
+* Machine Learning
+* Human Computer Interaction (HCI)
+* Gesture Recognition
+* Real-Time Prediction
+* Speech Recognition
+* Desktop Automation
+* Voice Processing
+* Data Collection
+* Model Training
+
+---
+
+# 🔮 Future Enhancements
+
+* Deep Learning Gesture Recognition
+* CNN-based Gesture Classification
+* Sign Language Recognition
+* Multi-Hand Tracking
+* AI Screen Assistant
+* Face Recognition Login
+* Smart Home Automation
+* IoT Device Control
+* Gesture Customization
+
+---
+
+# 👨‍💻 Author
 
 **Maddirevula Kushitha**
 
@@ -147,4 +232,7 @@ Bachelor of Engineering – Computer Science
 
 Dayananda Sagar Academy of Technology and Management
 
-GitHub: https://github.com/kushitha-16
+**GitHub:** https://github.com/kushitha-16
+
+---
+
