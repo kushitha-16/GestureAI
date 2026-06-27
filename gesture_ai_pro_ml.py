@@ -9,6 +9,7 @@ import speech_recognition as sr
 import pyttsx3
 import webbrowser
 import warnings
+import json
 
 warnings.filterwarnings("ignore")
 
@@ -94,7 +95,12 @@ def execute_voice_command(command):
 
 
 MODEL_FILE = "gesture_model.pkl"
+ACTIONS_FILE = "gesture_actions.json"
+
 model = joblib.load(MODEL_FILE)
+
+with open(ACTIONS_FILE, "r") as file:
+    gesture_actions = json.load(file)
 
 mp_hands = mp.solutions.hands
 mp_draw = mp.solutions.drawing_utils
@@ -115,7 +121,7 @@ ready_for_palm = True
 current_action = "Waiting..."
 prev_time = 0
 
-ACTION_COOLDOWN = 4
+ACTION_COOLDOWN = 3
 
 smooth_x = 0
 smooth_y = 0
@@ -123,9 +129,12 @@ SMOOTHING = 7
 FRAME_REDUCTION = 80
 
 CONFIDENCE_THRESHOLD = 75
-STABLE_FRAME_COUNT = 5
+STABLE_FRAME_COUNT = 6
 gesture_history = []
 stable_gesture = "No Hand"
+
+last_triggered_gesture = None
+gesture_locked = False
 
 
 def extract_landmarks(hand_landmarks):
@@ -221,12 +230,12 @@ def format_gesture_name(gesture):
     return names.get(gesture, gesture)
 
 def draw_dashboard(frame, gesture, action, status, confidence, fps):
-    cv2.rectangle(frame, (0, 0), (700, 220), (35, 35, 35), -1)
+    cv2.rectangle(frame, (0, 0), (760, 245), (35, 35, 35), -1)
 
-    cv2.putText(frame, "GestureAI Pro v2.0", (20, 35),
+    cv2.putText(frame, "GestureAI Pro v2.1", (20, 35),
                 cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 255), 2)
 
-    cv2.line(frame, (20, 50), (620, 50), (100, 100, 100), 2)
+    cv2.line(frame, (20, 50), (700, 50), (100, 100, 100), 2)
 
     cv2.putText(frame, f"Gesture     : {format_gesture_name(gesture)}", (20, 85),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
@@ -245,19 +254,25 @@ def draw_dashboard(frame, gesture, action, status, confidence, fps):
     cv2.putText(frame, f"FPS : {fps}", (500, 190),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-def perform_ml_action(gesture, hand_landmarks, frame_width, frame_height):
+    lock_text = "Locked" if gesture_locked else "Ready"
+    lock_color = (0, 0, 255) if gesture_locked else (0, 255, 0)
+
+    cv2.putText(frame, f"Trigger     : {lock_text}", (20, 225),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, lock_color, 2)
+
+def run_configured_action(action, hand_landmarks, frame_width, frame_height):
     global last_action_time, ready_for_palm, current_action
 
     current_time = time.time()
 
-    if gesture == "fist":
+    if action == "exit":
         current_action = "Exit Application"
         speak("Goodbye")
         cap.release()
         cv2.destroyAllWindows()
         exit()
 
-    if gesture == "one_finger":
+    if action == "air_mouse":
         current_action = "Air Mouse Active"
         index_x, index_y, pinch_distance = air_mouse_control(
             hand_landmarks,
@@ -269,61 +284,85 @@ def perform_ml_action(gesture, hand_landmarks, frame_width, frame_height):
     if current_time - last_action_time < ACTION_COOLDOWN:
         return None, None, None, None
 
-    if gesture == "palm" and ready_for_palm:
+    if action == "voice_assistant" and ready_for_palm:
         current_action = "Voice Assistant"
         command = listen_command()
         execute_voice_command(command)
         ready_for_palm = False
         last_action_time = current_time
 
-    elif gesture == "victory":
+    elif action == "open_vscode":
         current_action = "Opening VS Code"
         speak("Opening VS Code")
         os.system("code")
         last_action_time = current_time
 
-    elif gesture == "thumbs_up":
+    elif action == "volume_up":
         current_action = "Volume Up"
         speak("Volume Up")
         pyautogui.press("volumeup")
         last_action_time = current_time
 
-    elif gesture == "three_fingers":
+    elif action == "volume_down":
         current_action = "Volume Down"
         speak("Volume Down")
         pyautogui.press("volumedown")
         last_action_time = current_time
 
-    elif gesture == "rock":
+    elif action == "play_pause":
         current_action = "Play / Pause"
         speak("Play or Pause")
         pyautogui.press("playpause")
         last_action_time = current_time
 
-    elif gesture == "call_me":
+    elif action == "open_youtube":
         current_action = "Opening YouTube"
         speak("Opening YouTube")
         webbrowser.open("https://www.youtube.com")
         last_action_time = current_time
 
-    elif gesture == "peace":
+    elif action == "open_github":
         current_action = "Opening GitHub"
         speak("Opening GitHub")
         webbrowser.open("https://github.com")
         last_action_time = current_time
 
-    elif gesture == "ok_sign":
+    elif action == "left_click":
         current_action = "Left Click"
         speak("Left Click")
         pyautogui.click()
         last_action_time = current_time
 
-    elif gesture == "stop":
+    elif action == "stop":
         current_action = "Stop Detected"
         speak("Stop gesture detected")
         last_action_time = current_time
 
+    else:
+        current_action = f"No action for {action}"
+
     return None, None, None, None
+
+def perform_ml_action(gesture, hand_landmarks, frame_width, frame_height):
+    global gesture_locked, last_triggered_gesture
+
+    action = gesture_actions.get(gesture, "none")
+
+    # Air mouse should stay continuous, not locked
+    if action == "air_mouse":
+        return run_configured_action(action, hand_landmarks, frame_width, frame_height)
+
+    # Prevent repeated automatic triggering while hand remains visible
+    if gesture_locked and gesture == last_triggered_gesture:
+        return None, None, None, None
+
+    result = run_configured_action(action, hand_landmarks, frame_width, frame_height)
+
+    if action != "none":
+        gesture_locked = True
+        last_triggered_gesture = gesture
+
+    return result
 
 
 while True:
@@ -386,7 +425,7 @@ while True:
                 cv2.putText(
                     frame,
                     f"Pinch: {int(pinch_distance)}",
-                    (20, 250),
+                    (20, 270),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.8,
                     (255, 0, 0),
@@ -399,6 +438,8 @@ while True:
         gesture_history = []
         stable_gesture = "No Hand"
         display_gesture = "No Hand"
+        gesture_locked = False
+        last_triggered_gesture = None
 
     cv2.rectangle(
         frame,

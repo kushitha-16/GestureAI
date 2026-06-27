@@ -2,4 +2,7 @@ venv/
 .env
 __pycache__/
 *.pyc
-screen.png
+screen.pngscreen.png
+.env
+venv/
+__pycache__/

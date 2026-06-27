@@ -1,0 +1,13 @@
+{
+  "palm": "voice_assistant",
+  "victory": "open_vscode",
+  "one_finger": "air_mouse",
+  "ok_sign": "none",
+  "thumbs_up": "volume_up",
+  "three_fingers": "volume_down",
+  "rock": "play_pause",
+  "call_me": "open_youtube",
+  "peace": "open_github",
+  "fist": "exit",
+  "stop": "stop"
+}
